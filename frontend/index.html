@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>3D Avatar Chatbot v2.4 FINAL-FIX [<?php echo time(); ?>]</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* ===== LAYOUT ===== */
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ===== MAIN AREA ===== */
+        #main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            height: 100vh;
+        }
+
+        /* Top bar */
+        #top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            flex-shrink: 0;
+            z-index: 20;
+        }
+        #top-bar h1 {
+            color: white;
+            font-size: 1.4em;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+        .top-actions { display: flex; gap: 8px; }
+        .top-actions button {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 7px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .top-actions button:hover { background: rgba(255,255,255,0.35); }
+        .top-actions button.new-chat-btn {
+            background: rgba(50,205,50,0.35);
+            border-color: rgba(50,205,50,0.5);
+        }
+        .top-actions button.new-chat-btn:hover { background: rgba(50,205,50,0.55); }
+
+        /* Content area: avatar + chat side by side */
+        #content-area {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            gap: 0;
+            height: calc(100vh - 60px);
+        }
+
+        /* 3D Canvas Container */
+        #canvas-container {
+            position: relative;
+            flex: 1;
+            min-width: 300px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.3em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 5;
+        }
+
+        /* Chat panel beside avatar */
+        #chat-panel {
+            width: 340px;
+            min-width: 280px;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid rgba(0,0,0,0.1);
+            height: 100%;
+        }
+        #chat-panel-header {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+            font-size: 0.95em;
+            text-align: center;
+        }
+        #chat-messages {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            padding: 14px;
+            background: #f8f9fc;
+            min-height: 200px;
+            max-height: calc(100% - 120px);
+        }
+        #chat-messages:empty::before {
+            content: 'Type a message or use voice to start...';
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        .msg-bubble {
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.88em;
+            max-width: 90%;
+            line-height: 1.5;
+            word-wrap: break-word;
+            animation: fadeInUp 0.3s ease;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            margin: 4px 0;
+        }
+        .msg-bubble.user {
+            background: linear-gradient(135deg, #667eea, #764ba2) !important;
+            color: white !important;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            text-align: right;
+        }
+        .msg-bubble.ai {
+            background: white !important;
+            color: #222 !important;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #e8e8ee;
+            text-align: left;
+        }
+        .msg-bubble .sources {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 4px;
+            font-style: italic;
+        }
+        #chat-indicator {
+            text-align: center;
+            color: #667eea;
+            font-size: 0.85em;
+            padding: 10px;
+            font-weight: 500;
+            background: rgba(102, 126, 234, 0.08);
+            border-top: 1px solid rgba(102, 126, 234, 0.15);
+        }
+        #chat-indicator:empty {
+            display: none;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== BOTTOM INPUT BAR ===== */
+        #input-bar {
+            background: white;
+            padding: 12px 14px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-shrink: 0;
+            border-top: 1px solid #e8e8ee;
+        }
+        #chatInput {
+            flex: 1;
+            padding: 9px 14px;
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            font-size: 0.9em;
+            outline: none;
+            transition: border-color 0.2s;
+            min-width: 0;
+        }
+        #chatInput:focus { border-color: #667eea; }
+        #sendBtn, #recordBtn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 1.05em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 0.15s, box-shadow 0.15s;
+            padding: 0;
+            margin: 0;
+            background: linear-gradient(135deg, #aebbf5, #dac4f0);
+            color: white;
+        }
+        #sendBtn:hover, #recordBtn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 3px 12px rgba(102,126,234,0.4);
+        }
+        #recordBtn.recording {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ===== PDF PANEL (modal overlay) ===== */
+        #pdf-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        #pdf-overlay.open { display: flex; }
+        #pdf-modal {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            width: 420px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        #pdf-modal h3 { margin-bottom: 14px; color: #333; }
+        #pdf-drop {
+            border: 2px dashed #bbb;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            color: #888;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            margin-bottom: 14px;
+        }
+        #pdf-drop:hover, #pdf-drop.dragover {
+            border-color: #667eea;
+            background: rgba(102,126,234,0.05);
+        }
+        #pdf-drop input { display: none; }
+        #upload-status {
+            font-size: 0.85em;
+            color: #667eea;
+            min-height: 20px;
+            margin-bottom: 10px;
+        }
+        #doc-list { list-style: none; }
+        #doc-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8f8fc;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 0.9em;
+        }
+        #doc-list li button {
+            background: #ff5c5c;
+            border: none;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        #pdf-close {
+            margin-top: 12px;
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.95em;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- MAIN -->
+        <div id="main">
+            <div id="top-bar">
+                <h1>&#129302; 3D Avatar Chatbot</h1>
+                <div class="top-actions">
+                    <button class="new-chat-btn" onclick="newChat()">&#10024; New Chat</button>
+                    <button onclick="openPdfModal()">&#128196; Docs</button>
+                    <button id="testBtn">&#128268; Test</button>
+                </div>
+            </div>
+
+            <!-- Content: Avatar + Chat side by side -->
+            <div id="content-area">
+                <!-- 3D Canvas -->
+                <div id="canvas-container">
+                    <div id="loading">Loading 3D Avatar...</div>
+                </div>
+
+                <!-- Chat Panel beside avatar -->
+                <div id="chat-panel">
+                    <div id="chat-panel-header">&#128172; Conversation</div>
+                    <div id="chat-messages"></div>
+                    <div id="chat-indicator"></div>
+                    <!-- Input bar inside chat panel -->
+                    <form id="input-form" onsubmit="return false;">
+                        <div id="input-bar">
+                            <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" />
+                            <button type="button" id="sendBtn" title="Send text">&#128228;</button>
+                            <button type="button" id="recordBtn" title="Voice input">&#127908;</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF MODAL -->
+    <div id="pdf-overlay">
+        <div id="pdf-modal">
+            <h3>&#128196; Manage PDF Documents</h3>
+            <div id="pdf-drop" onclick="document.getElementById('pdfFileInput').click()">
+                <input type="file" id="pdfFileInput" accept=".pdf" multiple />
+                &#128193; Click or drag PDFs here to upload
+            </div>
+            <div id="upload-status"></div>
+            <ul id="doc-list"></ul>
+            <button id="pdf-close" onclick="closePdfModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const API_URL = 'http://localhost:8000';
+
+        // ==================== THREE.JS SCENE ====================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x667eea);
+
+        const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+        camera.position.set(0, 1.4, 1.2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.shadowMap.enabled = true;
+        const canvasContainer = document.getElementById('canvas-container');
+        canvasContainer.appendChild(renderer.domElement);
+
+        function resizeRenderer() {
+            const w = canvasContainer.clientWidth;
+            const h = canvasContainer.clientHeight;
+            renderer.setSize(w, h);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
+        resizeRenderer();
+        window.addEventListener('resize', resizeRenderer);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1.3, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 0.8;
+        controls.maxDistance = 2.0;
+        controls.maxPolarAngle = Math.PI / 1.5;
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        fillLight.position.set(-5, 5, -5);
+        scene.add(fillLight);
+
+        // ==================== AVATAR ====================
+        const loader = new GLTFLoader();
+        let avatar = null;
+        let morphTargetMeshes = [];
+        const avatarUrl = 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb';
+        const fallbackUrls = [
+            'https://models.readyplayer.me/6478a3e4393b9f37e5156789.glb',
+            'https://models.readyplayer.me/65d3fa83c879f7e926a36f7a.glb'
+        ];
+        let currentUrlIndex = 0;
+
+        function loadAvatar(url) {
+            loader.load(url,
+                (gltf) => {
+                    avatar = gltf.scene;
+                    avatar.scale.set(1, 1, 1);
+                    avatar.position.set(0, -0.3, 0);
+                    avatar.traverse((node) => {
+                        if (node.isMesh) {
+                            node.castShadow = true;
+                            node.receiveShadow = true;
+                            if (node.morphTargetInfluences && node.morphTargetDictionary) {
+                                morphTargetMeshes.push(node);
+                            }
+                        }
+                    });
+                    scene.add(avatar);
+                    document.getElementById('loading').style.display = 'none';
+                },
+                (xhr) => {
+                    const pct = (xhr.loaded / xhr.total) * 100;
+                    document.getElementById('loading').textContent = `Loading Avatar... ${Math.round(pct)}%`;
+                },
+                (error) => {
+                    if (currentUrlIndex < fallbackUrls.length) {
+                        loadAvatar(fallbackUrls[currentUrlIndex++]);
+                    } else {
+                        createPlaceholderAvatar();
+                    }
+                }
+            );
+        }
+
+        function createPlaceholderAvatar() {
+            const group = new THREE.Group();
+            const headGeo = new THREE.SphereGeometry(0.15, 32, 32);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.6;
+            group.add(head);
+            const bodyGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.6, 32);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a90e2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1.0;
+            group.add(body);
+            const armGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 16);
+            const armMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+            const lArm = new THREE.Mesh(armGeo, armMat);
+            lArm.position.set(-0.25, 1.0, 0); lArm.rotation.z = 0.3;
+            group.add(lArm);
+            const rArm = new THREE.Mesh(armGeo, armMat);
+            rArm.position.set(0.25, 1.0, 0); rArm.rotation.z = -0.3;
+            group.add(rArm);
+            avatar = group;
+            scene.add(avatar);
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        loadAvatar(avatarUrl);
+
+        // ==================== ANIMATION ====================
+        let isSpeaking = false;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isSpeaking && morphTargetMeshes.length > 0) {
+                const mouthOpen = Math.abs(Math.sin(Date.now() * 0.15 * 0.01));
+                morphTargetMeshes.forEach(mesh => {
+                    ['mouthOpen', 'jawOpen', 'viseme_aa', 'Mouth_Open'].forEach(name => {
+                        if (mesh.morphTargetDictionary && mesh.morphTargetDictionary[name] !== undefined) {
+                            mesh.morphTargetInfluences[mesh.morphTargetDictionary[name]] = mouthOpen * 0.7;
+                        }
+                    });
+                });
+            } else if (morphTargetMeshes.length > 0) {
+                morphTargetMeshes.forEach(mesh => {
+                    if (mesh.morphTargetInfluences) {
+                        mesh.morphTargetInfluences.forEach((_, i) => {
+                            mesh.morphTargetInfluences[i] *= 0.9;
+                        });
+                    }
+                });
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ==================== CHAT PANEL HELPERS ====================
+        const chatMessages = document.getElementById('chat-messages');
+        const chatIndicator = document.getElementById('chat-indicator');
+
+        console.log('[INIT] chatMessages element:', chatMessages);
+        console.log('[INIT] chatIndicator element:', chatIndicator);
+
+        function addMessage(text, type, sources) {
+            console.log(`[addMessage] ====== ADDING MESSAGE ======`);
+            console.log(`[addMessage] Type: ${type}`);
+            console.log(`[addMessage] Text: ${text}`);
+            console.log('[addMessage] chatMessages exists:', !!chatMessages);
+            console.log('[addMessage] chatMessages visible:', chatMessages && chatMessages.offsetHeight > 0);
+            
+            if (!chatMessages) {
+                console.error('[addMessage] CRITICAL ERROR: chatMessages element not found!');
+                alert('ERROR: Chat panel not found!');
+                return;
+            }
+            
+            const bubble = document.createElement('div');
+            bubble.className = `msg-bubble ${type}`;
+            bubble.textContent = text;
+            
+            // Force visibility with inline styles
+            bubble.style.cssText = `
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                padding: 10px 14px;
+                border-radius: 14px;
+                font-size: 0.88em;
+                max-width: 90%;
+                line-height: 1.5;
+                word-wrap: break-word;
+                margin: 4px 0;
+                ${type === 'user' ? 'background: linear-gradient(135deg, #667eea, #764ba2); color: white; align-self: flex-end; text-align: right;' : 'background: white; color: #222; align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #e8e8ee;'}
+            `;
+
+            if (type === 'ai' && sources && sources.length > 0) {
+                const srcDiv = document.createElement('div');
+                srcDiv.className = 'sources';
+                srcDiv.textContent = '\u{1F4C4} Sources: ' + sources.join(', ');
+                srcDiv.style.cssText = 'font-size: 0.75em; color: #888; margin-top: 4px; font-style: italic;';
+                bubble.appendChild(srcDiv);
+            }
+
+            console.log('[addMessage] Bubble created:', bubble);
+            console.log('[addMessage] Bubble styles:', bubble.style.cssText);
+            
+            chatMessages.appendChild(bubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            console.log('[addMessage] ✅ SUCCESS! Total messages:', chatMessages.children.length);
+            console.log('[addMessage] chatMessages HTML:', chatMessages.innerHTML.substring(0, 200));
+            console.log(`[addMessage] ==============================`);
+        }
+
+        function showIndicator(msg) {
+            console.log(`[indicator] ${msg}`);
+            chatIndicator.textContent = msg;
+        }
+
+        function hideIndicator() {
+            chatIndicator.textContent = '';
+        }
+
+        function clearChatOverlay() {
+            chatMessages.innerHTML = '';
+            hideIndicator();
+        }
+
+        // ==================== AUDIO PLAYBACK + LIP-SYNC ====================
+        // Pre-warm audio context on first user interaction to avoid autoplay block
+        let audioContext = null;
+        function ensureAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // Warm up on ANY user click/touch so audio.play() works later
+        document.addEventListener('click', ensureAudioContext, { once: false });
+        document.addEventListener('touchstart', ensureAudioContext, { once: false });
+
+        function playAudio(audioUrl) {
+            const fullUrl = `${API_URL}${audioUrl}`;
+            console.log(`[playAudio] Loading: ${fullUrl}`);
+            return new Promise((resolve) => {
+                ensureAudioContext();
+                const audio = new Audio();
+                audio.crossOrigin = 'anonymous';
+                audio.preload = 'auto';
+
+                audio.addEventListener('canplaythrough', () => {
+                    console.log('[playAudio] canplaythrough fired, calling play()');
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log('[playAudio] play() succeeded, lip-sync ON');
+                            isSpeaking = true;
+                            showIndicator('\u{1F50A} Speaking...');
+                        }).catch((err) => {
+                            console.warn('[playAudio] play() BLOCKED:', err.message);
+                            showIndicator('\u26A0\uFE0F Audio blocked - click anywhere then retry');
+                            isSpeaking = false;
+                            resolve();
+                        });
+                    }
+                }, { once: true });
+
+                audio.addEventListener('ended', () => {
+                    console.log('[playAudio] ended, lip-sync OFF');
+                    isSpeaking = false;
+                    hideIndicator();
+                    resolve();
+                }, { once: true });
+
+                audio.addEventListener('error', (e) => {
+                    console.error('[playAudio] ERROR:', e.target?.error?.message || e);
+                    showIndicator('\u274C Audio playback error');
+                    isSpeaking = false;
+                    resolve();
+                }, { once: true });
+
+                audio.src = fullUrl;
+                audio.load();
+                console.log('[playAudio] audio.load() called');
+            });
+        }
+
+        // ==================== HANDLE RESPONSE ====================
+        async function handleResponse(data) {
+            console.log('[handleResponse] RECEIVED DATA:', data);
+            console.log('[handleResponse] success:', data.success);
+            console.log('[handleResponse] user_message:', data.user_message);
+            console.log('[handleResponse] ai_response:', data.ai_response);
+            
+            hideIndicator();
+            if (data.success) {
+                const userText = data.transcribed_text || data.user_message;
+                console.log('[handleResponse] Adding user message:', userText);
+                addMessage(userText, 'user');
+                
+                console.log('[handleResponse] Adding AI response:', data.ai_response);
+                addMessage(data.ai_response, 'ai', data.sources);
+
+                if (data.audio_url) {
+                    console.log('[handleResponse] Playing audio:', data.audio_url);
+                    await playAudio(data.audio_url);
+                } else {
+                    console.warn('[handleResponse] No audio_url in response!');
+                }
+            } else {
+                console.error('[handleResponse] FAIL:', data.message);
+                showIndicator('\u274C ' + (data.message || 'Something went wrong'));
+            }
+        }
+
+        // ==================== TEXT CHAT ====================
+        async function sendTextMessage(event) {
+            // Prevent any default behavior
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            
+            console.log('[sendText] Called with text:', text);
+            
+            if (!text) {
+                console.log('[sendText] Empty text, returning');
+                return false;
+            }
+            
+            input.value = '';
+            ensureAudioContext();
+
+            showIndicator('\u23F3 Thinking...');
+            
+            console.log('[sendText] About to add user message to chat...');
+            addMessage(text, 'user');
+
+            try {
+                console.log('[sendText] Sending to API:', text);
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                console.log('[sendText] Got response:', data);
+                
+                // Add AI response
+                if (data.success && data.ai_response) {
+                    console.log('[sendText] Adding AI response to chat...');
+                    addMessage(data.ai_response, 'ai', data.sources);
+                    hideIndicator();
+                    
+                    // Play audio if available
+                    if (data.audio_url) {
+                        console.log('[sendText] Playing audio:', data.audio_url);
+                        await playAudio(data.audio_url);
+                    }
+                } else {
+                    console.error('[sendText] Response error:', data);
+                    showIndicator('\u274C ' + (data.message || 'Something went wrong'));
+                }
+            } catch (err) {
+                showIndicator('\u274C Failed to send message');
+                console.error('[sendText] Error:', err);
+            }
+            
+            return false;
+        }
+
+        // ==================== VOICE RECORDING ====================
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        async function toggleRecording() {
+            const recordBtn = document.getElementById('recordBtn');
+            ensureAudioContext();
+
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        stream.getTracks().forEach(t => t.stop());
+                        console.log(`[voice] Recording stopped, blob size=${blob.size}`);
+                        showIndicator('\u23F3 Processing audio...');
+
+                        try {
+                            const formData = new FormData();
+                            formData.append('audio', blob, 'recording.webm');
+                            const res = await fetch(`${API_URL}/process-audio`, { method: 'POST', body: formData });
+                            const data = await res.json();
+                            await handleResponse(data);
+                        } catch (err) {
+                            showIndicator('\u274C Failed to process audio');
+                            console.error(err);
+                        }
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.textContent = '\u23F9\uFE0F';
+                    recordBtn.classList.add('recording');
+                    showIndicator('\u{1F3A4} Recording... Speak now!');
+                } catch (err) {
+                    showIndicator('\u274C Microphone access denied');
+                    console.error(err);
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = '\u{1F3A4}';
+                recordBtn.classList.remove('recording');
+            }
+        }
+
+        // ==================== TEST BACKEND ====================
+        async function testBackend() {
+            try {
+                showIndicator('\u23F3 Connecting...');
+                const res = await fetch(`${API_URL}/test`);
+                const data = await res.json();
+                if (data.success) {
+                    showIndicator(`\u2705 Connected! ${data.documents_count} PDFs loaded. RAG: ${data.rag_ready ? 'Ready' : 'No docs'}`);
+                    setTimeout(hideIndicator, 4000);
+                    
+                    // Test message display - VERY VISIBLE
+                    console.log('[TEST] ===== TESTING MESSAGE DISPLAY =====');
+                    console.log('[TEST] chatMessages element:', chatMessages);
+                    console.log('[TEST] chatMessages parent:', chatMessages?.parentElement);
+                    console.log('[TEST] chatMessages children before:', chatMessages?.children.length);
+                    
+                    alert('✅ Backend connected! Adding test messages now...');
+                    
+                    addMessage('🧪 TEST USER MESSAGE - If you see this, display is working!', 'user');
+                    addMessage('🤖 TEST AI RESPONSE - Messages are displaying correctly!', 'ai');
+                    
+                    console.log('[TEST] chatMessages children after:', chatMessages?.children.length);
+                    console.log('[TEST] ===== TEST COMPLETE =====');
+                    
+                    alert('✅ Test messages added! Check the conversation box on the right →');
+                } else {
+                    throw new Error();
+                }
+            } catch (err) {
+                showIndicator('\u274C Backend connection failed!');
+                console.error('[TEST] Error:', err);
+                alert('❌ Backend connection failed! Check console.');
+            }
+        }
+
+        // ==================== NEW CHAT ====================
+        window.newChat = async function() {
+            try {
+                const res = await fetch(`${API_URL}/new-chat`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    clearChatOverlay();
+                    showIndicator('\u2728 New chat started!');
+                    setTimeout(hideIndicator, 2000);
+                }
+            } catch (err) {
+                showIndicator('\u274C Failed to start new chat');
+                console.error(err);
+            }
+        };
+
+        // ==================== PDF MANAGEMENT ====================
+        window.openPdfModal = function() {
+            document.getElementById('pdf-overlay').classList.add('open');
+            loadDocuments();
+        };
+
+        window.closePdfModal = function() {
+            document.getElementById('pdf-overlay').classList.remove('open');
+        };
+
+        window.loadDocuments = async function() {
+            try {
+                const res = await fetch(`${API_URL}/documents`);
+                const data = await res.json();
+                const list = document.getElementById('doc-list');
+                list.innerHTML = '';
+                if (data.documents.length === 0) {
+                    list.innerHTML = '<li style="color:#888;justify-content:center;">No documents uploaded yet</li>';
+                    return;
+                }
+                data.documents.forEach(name => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>\u{1F4C4} ${name}</span><button onclick="deleteDoc('${name}')">\u{1F5D1}\uFE0F</button>`;
+                    list.appendChild(li);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        };
+
+        window.deleteDoc = async function(name) {
+            if (!confirm(`Delete "${name}"?`)) return;
+            const statusEl = document.getElementById('upload-status');
+            statusEl.textContent = 'Deleting...';
+            try {
+                await fetch(`${API_URL}/documents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+                statusEl.textContent = `Deleted ${name}`;
+                loadDocuments();
+            } catch (err) {
+                statusEl.textContent = 'Delete failed';
+            }
+        };
+
+        async function uploadFiles(files) {
+            const statusEl = document.getElementById('upload-status');
+            for (const file of files) {
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    statusEl.textContent = `Skipped ${file.name} (not PDF)`;
+                    continue;
+                }
+                statusEl.textContent = `Uploading ${file.name}...`;
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await fetch(`${API_URL}/upload-pdf`, { method: 'POST', body: formData });
+                    const data = await res.json();
+                    statusEl.textContent = data.message || 'Uploaded!';
+                } catch (err) {
+                    statusEl.textContent = `Failed to upload ${file.name}`;
+                }
+            }
+            loadDocuments();
+        }
+
+        document.getElementById('pdfFileInput').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) uploadFiles(e.target.files);
+        });
+
+        const dropZone = document.getElementById('pdf-drop');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) uploadFiles(e.dataTransfer.files);
+        });
+
+        document.getElementById('pdf-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'pdf-overlay') closePdfModal();
+        });
+
+        // ==================== GLOBAL FORM PREVENTION ====================
+        // Prevent ALL form submissions globally
+        document.addEventListener('submit', (e) => {
+            console.log('[GLOBAL] Prevented form submission');
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+        
+        // Prevent page unload/refresh
+        let allowUnload = false;
+        window.addEventListener('beforeunload', (e) => {
+            if (!allowUnload) {
+                console.log('[GLOBAL] Prevented page unload');
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
+
+        // ==================== EVENT LISTENERS ====================
+        document.getElementById('recordBtn').addEventListener('click', toggleRecording);
+        document.getElementById('sendBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[sendBtn] Button clicked');
+            sendTextMessage(e);
+            return false;
+        });
+        document.getElementById('testBtn').addEventListener('click', testBackend);
+        document.getElementById('chatInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[ENTER KEY] Enter pressed, sending message');
+                sendTextMessage(e);
+                return false;
+            }
+        });
+
+        // ==================== INIT ====================
+        console.log('='.repeat(60));
+        console.log('🚀 3D Avatar Chatbot - Frontend v2.4 FINAL-FIX - ' + new Date().toISOString());
+        console.log('='.repeat(60));
+        console.log('⚠️ PAGE REFRESH PREVENTION ACTIVE');
+        console.log('Chat Panel Ready:', !!chatMessages);
+        console.log('Chat Panel Visible:', chatMessages && chatMessages.offsetHeight > 0);
+        console.log('Chat Panel Width:', chatMessages && chatMessages.offsetWidth);
+        console.log('Chat Panel Height:', chatMessages && chatMessages.offsetHeight);
+        console.log('Chat Panel Display:', chatMessages && window.getComputedStyle(chatMessages).display);
+        console.log('Chat Panel Visibility:', chatMessages && window.getComputedStyle(chatMessages).visibility);
+        console.log('API URL:', API_URL);
+        console.log('='.repeat(60));
+        console.log('💡 TIP: Type a message and press Enter');
+        console.log('💡 Watch the console for [addMessage] logs');
+        console.log('='.repeat(60));
+        
+        // Add a test message after 2 seconds to verify display works
+        setTimeout(() => {
+            console.log('[AUTO-TEST] Adding automatic test message in 2 seconds...');
+            addMessage('🧪 AUTO-TEST: If you see this message, the display is working!', 'ai');
+            showIndicator('✅ Frontend v2.2 loaded - Display test message added!');
+            setTimeout(hideIndicator, 4000);
+        }, 2000);
+    </script>
+</body>
+</html>

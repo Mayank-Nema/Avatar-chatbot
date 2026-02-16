@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test - NO CACHE</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        #messages { background: white; padding: 20px; margin: 20px 0; min-height: 300px; border: 2px solid #333; }
+        .msg { padding: 10px; margin: 10px 0; border-radius: 8px; }
+        .user { background: #e3d5ff; text-align: right; }
+        .ai { background: #d5f4e6; text-align: left; }
+        input { padding: 10px; width: 300px; font-size: 16px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #45a049; }
+        #status { margin: 10px 0; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Simple Chat Test - v<?php echo time(); ?></h1>
+    <div id="status">Status: Ready</div>
+    
+    <div id="messages">
+        <div class="msg ai">Test message appears here...</div>
+    </div>
+    
+    <input type="text" id="input" placeholder="Type message..." />
+    <button onclick="sendMessage()">Send</button>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let msgCount = 0;
+        
+        function addMsg(text, type) {
+            msgCount++;
+            console.log(`[${msgCount}] Adding ${type} message:`, text);
+            const div = document.createElement('div');
+            div.className = 'msg ' + type;
+            div.textContent = text;
+            div.style.display = 'block';
+            document.getElementById('messages').appendChild(div);
+            console.log(`[${msgCount}] Message added to DOM`);
+            return div;
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('input');
+            const text = input.value.trim();
+            const status = document.getElementById('status');
+            
+            console.log('[SEND] Starting with text:', text);
+            
+            if (!text) {
+                alert('Please type a message!');
+                return;
+            }
+            
+            // Clear input and add user message immediately
+            input.value = '';
+            addMsg(text, 'user');
+            status.textContent = 'Status: Sending to AI...';
+            
+            try {
+                console.log('[SEND] Fetching from API...');
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                
+                console.log('[SEND] Got response, parsing...');
+                const data = await res.json();
+                console.log('[SEND] Parsed data:', data);
+                
+                if (data.success && data.ai_response) {
+                    addMsg(data.ai_response, 'ai');
+                    status.textContent = 'Status: ✓ Response received!';
+                    console.log('[SEND] Success!');
+                } else {
+                    status.textContent = 'Status: ✗ Error - ' + (data.message || 'Unknown error');
+                    console.error('[SEND] API error:', data);
+                }
+            } catch (err) {
+                status.textContent = 'Status: ✗ Network error - ' + err.message;
+                console.error('[SEND] Fetch error:', err);
+            }
+        }
+        
+        // Allow Enter key
+        document.getElementById('input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                console.log('[ENTER] Enter key pressed');
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        console.log('🚀 Test page loaded successfully - ' + new Date().toISOString());
+        console.log('Messages container:', document.getElementById('messages'));
+    </script>
+</body>
+</html>

@@ -7,7 +7,8 @@ import os
 import whisper
 import tempfile
 import shutil
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import edge_tts
 import asyncio
 import traceback
@@ -72,10 +73,9 @@ print("✅ Whisper model loaded!")
 # ==================== CONFIGURE GEMINI API ====================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # Use valid Gemini model name (try gemini-1.5-flash, gemini-1.5-pro, or gemini-pro)
-    gemini_model = genai.GenerativeModel('gemini-2.5-flash')
-    chat_session = gemini_model.start_chat(history=[])
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    MODEL_ID = 'gemini-2.0-flash-exp'
+    chat_session = client.chats.create(model=MODEL_ID)
     print("✅ Gemini API configured!")
 else:
     print("⚠️ Warning: GEMINI_API_KEY not found in .env file")
@@ -296,7 +296,7 @@ def rebuild_index():
 
     return total_chunks
 
-def retrieve_context(query: str, k: int = 3, relevance_threshold: float = 0.8) -> tuple:
+def retrieve_context(query: str, k: int = 3, relevance_threshold: float = 0.3) -> tuple:
     """
     Retrieve relevant document chunks for a query with strict relevance filtering.
     
@@ -352,7 +352,7 @@ async def process_message(user_text: str) -> dict:
     Retrieval → Validation → Context-only Generation → Citation
     """
     # Step 1: Retrieve context with relevance validation
-    context, sources, is_relevant = retrieve_context(user_text, k=3, relevance_threshold=0.8)
+    context, sources, is_relevant = retrieve_context(user_text, k=3, relevance_threshold=0.3)
 
     # Step 2: Handle irrelevant queries
     if not is_relevant:
@@ -683,9 +683,9 @@ async def delete_document(filename: str):
 @app.post("/new-chat")
 async def new_chat():
     """Reset the Gemini chat session for a new conversation thread."""
-    global chat_session
+    global chat_session, client
     try:
-        chat_session = gemini_model.start_chat(history=[])
+        chat_session = client.chats.create(model=MODEL_ID)
         print("🔄 New chat session started!")
         return {"success": True, "message": "New chat session started"}
     except Exception as e:

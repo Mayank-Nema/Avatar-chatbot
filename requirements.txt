@@ -4,7 +4,7 @@ uvicorn[standard]==0.32.0
 python-multipart==0.0.12
 openai-whisper
 edge-tts==7.2.7
-google-generativeai
+google-genai
 python-dotenv==1.0.1
 setuptools
 

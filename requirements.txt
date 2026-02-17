@@ -1,0 +1,23 @@
+# Backend Dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+openai-whisper
+edge-tts==7.2.7
+google-generativeai
+python-dotenv==1.0.1
+setuptools
+
+# RAG Pipeline - Optimized for Large PDFs
+langchain
+langchain-community
+langchain-huggingface
+sentence-transformers
+langchain-text-splitters
+faiss-cpu
+
+# PDF Processing - Memory Efficient
+PyMuPDF>=1.23.0  # Fast PDF extraction
+pytesseract>=0.3.10  # OCR for scanned PDFs
+Pillow>=10.0.0  # Image processing for OCR
+pdfplumber>=0.10.0  # Fallback PDF reader
